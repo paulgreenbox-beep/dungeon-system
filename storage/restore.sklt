@@ -1,0 +1,38 @@
+schema_version:
+    1
+id:
+    storage.restore
+object_id:
+    storage.restore
+kind:
+    component
+responsibility:
+    bring archived bytes back to hot storage and materialize editable files when required
+level:
+    L3
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    PERMANENT
+flags:
+    - RESTORE_REQUIRED
+inputs:
+    archived artifact
+    target location
+    required integrity state
+outputs:
+    restored CAS object
+    materialized LIVE file
+    updated location registry
+depends_on:
+    storage.archive
+    storage.storage_manifest
+effects:
+    reversible archival
+    editable materialization
+state:
+    SKLT

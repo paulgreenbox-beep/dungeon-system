@@ -1,0 +1,22 @@
+{
+  "name": "dungeon-system-source",
+  "interface": {
+    "displayName": "Dungeon System source"
+  },
+  "plugins": [
+    {
+      "name": "dungeon-system",
+      "source": {
+        "source": "local",
+        "path": "./tools/codex-plugin/dungeon-system"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "interface": {
+        "displayName": "Dungeon System"
+      }
+    }
+  ]
+}

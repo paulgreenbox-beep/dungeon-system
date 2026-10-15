@@ -1,0 +1,39 @@
+schema_version:
+    1
+id:
+    storage.storage_metrics
+object_id:
+    storage.storage_metrics
+kind:
+    component
+responsibility:
+    collect derived storage metrics: logical and physical bytes, dedup, compression, tiers and integrity
+level:
+    L4
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    CACHE
+flags:
+    - GC_CANDIDATE
+inputs:
+    CAS scan
+    pack manifests
+    storage registry
+    location descriptors
+outputs:
+    storage statistics
+    dedup and compression ratios
+    health status
+depends_on:
+    storage.storage_manifest
+    storage.pack_seal
+effects:
+    measurable storage cost
+    detectable degradation
+state:
+    SKLT

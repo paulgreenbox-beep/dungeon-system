@@ -1,0 +1,34 @@
+schema_version:
+    1
+id:
+    scoping.isolation
+object_id:
+    scoping.isolation
+kind:
+    component
+responsibility:
+    classify architectural independence as SHARED BOUNDED ISOLATED or EXTERNAL
+level:
+    L1
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    PERMANENT
+inputs:
+    dependency direction
+    public surface
+    ownership and CI signals
+outputs:
+    isolation level per module
+    escalation and de-escalation reason
+depends_on:
+    scoping.level_identity
+effects:
+    boundary strength separate from history boundary
+    no automatic progression
+state:
+    SKLT

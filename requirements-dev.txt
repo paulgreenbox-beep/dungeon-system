@@ -1,0 +1,3 @@
+# Test/verification dependencies only; runtime uses the Python standard library.
+jsonschema==4.26.0
+PyYAML==6.0.3

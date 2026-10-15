@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dungeon.evidence.v1",
+  "title": "Dungeon Evidence Manifest v1",
+  "$comment": "SEALED means immutable integrity, never execution PASS. v0.4.1 captures structure.objects[*].obligation_sha256 for the complete UTF-8 SKLT with BOM removed and CR/LF normalized to LF. Missing historical hashes remain schema-valid but proof INCOMPLETE. artifacts.result must use a supported versioned raw adapter; arbitrary JSON PASS is not proof. Toolkit reliability-v2 adapter: report.proof={adapter:toolkit-reliability-v2,schema_version:2,raw:sha256-reference,bindings:[{id,type,scope,action_id,operation}]}; raw must be a distinct artifact CAS reference to the Toolkit schema_version=2, tool_version=ai-ui-test-tool-auto-probe, contract_version=reliability-v2 action bundle. Only bounded canonical assertions are supported; every claimed check maps to one distinct ActionRecord. All artifact refs except result are inspected for bounded negative vetoes regardless of name. Every extra digest other than the adapter-bound raw digest has no supported correspondence and makes proof INCOMPLETE/PROOF_UNVERIFIED, including stdout, stderr, audit artifacts and PNG screenshots. Unknown/missing raw correspondence is PROOF_UNVERIFIED. This establishes correspondence, not executor authenticity or full GPU acceptance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "id",
+    "created_at",
+    "project",
+    "objects",
+    "git",
+    "structure",
+    "execution",
+    "inputs",
+    "artifacts",
+    "result"
+  ],
+  "properties": {
+    "format": {"const": "dungeon.evidence.v1"},
+    "id": {"type": "string", "pattern": "^EV-[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "task_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"},
+    "scope": {"enum": ["PROTOTYPE", "PRODUCT"]},
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "provenance", "files"],
+      "properties": {
+        "revision": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40,64}$"},
+        "provenance": {"const": "local-files"},
+        "files": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256", "cas"],
+            "properties": {
+              "path": {"type": "string", "minLength": 1, "maxLength": 4096},
+              "sha256": {"$ref": "#/$defs/sha256"},
+              "cas": {"$ref": "#/$defs/casReference"}
+            }
+          }
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {"id": {"type": "string", "minLength": 1}}
+    },
+    "objects": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/objectId"}
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "dirty"],
+      "properties": {
+        "commit": {"type": ["string", "null"]},
+        "dirty": {"type": ["boolean", "null"]}
+      }
+    },
+    "structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshot", "objects"],
+      "properties": {
+        "snapshot": {"type": ["string", "null"]},
+        "objects": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/objectId"},
+          "additionalProperties": {
+            "type": "object",
+            "required": ["state", "sklt"],
+            "properties": {
+              "state": {"enum": ["SKLT", "RARE"]},
+              "sklt": {"type": "string"},
+              "obligation_sha256": {"$ref": "#/$defs/sha256"}
+            }
+          }
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "type", "id"],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1},
+        "type": {"enum": ["container", "tool"]},
+        "id": {"type": "string", "minLength": 1}
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/casReference"}
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/casReference"}
+    },
+    "result": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"}
+      }
+    }
+  },
+  "$defs": {
+    "objectId": {"type": "string", "maxLength": 1024, "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9._-]*|declared:(?:(?:capability|command|action):[A-Za-z_][A-Za-z0-9_.:-]*|(?:project|module):[A-Za-z_][A-Za-z0-9_.:-]*(?:/(?:project|module):[A-Za-z_][A-Za-z0-9_.:-]*)*(?:/(?:project|module|capability|command|action):[A-Za-z_][A-Za-z0-9_.:-]*)?))$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "casReference": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

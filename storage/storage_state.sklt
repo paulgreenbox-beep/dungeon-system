@@ -1,0 +1,37 @@
+schema_version:
+    1
+id:
+    storage.storage_state
+object_id:
+    storage.storage_state
+kind:
+    component
+responsibility:
+    third independent axis describing where artifact bytes physically are
+level:
+    L1
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    PERMANENT
+flags:
+    - PINNED
+inputs:
+    artifact reference
+    CAS layout
+    pack manifest
+    archive location descriptor
+outputs:
+    storage state LIVE CAS PACKED ARCHIVED OFFLINE MISSING or CORRUPT
+depends_on:
+    storage.cas
+    storage.artifact_classes
+effects:
+    axis separation from structural state
+    physical availability
+state:
+    SKLT

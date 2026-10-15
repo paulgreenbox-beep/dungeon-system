@@ -1,0 +1,35 @@
+schema_version:
+    1
+id:
+    scoping.cross_scope_dependency
+object_id:
+    scoping.cross_scope_dependency
+kind:
+    component
+responsibility:
+    require cross scope dependencies to be declared and attributable to source and target scopes
+level:
+    L2
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    PERMANENT
+inputs:
+    normalized object dependency
+    source and target git scope
+    dependency type
+outputs:
+    declared cross scope edge
+    validation of undeclared access
+depends_on:
+    scoping.git_scope
+    scoping.isolation
+effects:
+    explicit coupling
+    no implicit cross repository access
+state:
+    SKLT

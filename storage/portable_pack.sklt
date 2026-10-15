@@ -1,0 +1,27 @@
+schema_version:
+    1
+id:
+    storage.portable_pack
+object_id:
+    storage.portable_pack
+kind:
+    component
+responsibility:
+    export and import a self contained .dpack for transfer, archive and offline handoff
+level:
+    L2
+inputs:
+    sealed pack
+    CAS objects
+    target path
+outputs:
+    .dpack archive
+    imported pack registration
+depends_on:
+    storage.pack_seal
+    storage.logical_pack
+effects:
+    portable handoff
+    deduplicated import
+state:
+    SKLT

@@ -1,0 +1,26 @@
+schema_version:
+    1
+id:
+    storage.selective_extract
+object_id:
+    storage.selective_extract
+kind:
+    component
+responsibility:
+    inspect, list and extract individual pack objects without unpacking the whole pack
+level:
+    L2
+inputs:
+    pack id
+    object selector
+outputs:
+    inspected manifest
+    extracted object
+    ephemeral extraction directory
+depends_on:
+    storage.logical_pack
+effects:
+    cheap inspection
+    bounded temporary footprint
+state:
+    SKLT

@@ -1,0 +1,28 @@
+schema_version:
+    1
+id:
+    storage.cas_gc
+object_id:
+    storage.cas_gc
+kind:
+    component
+responsibility:
+    collect garbage from CAS by reachability from sealed and pinned roots
+level:
+    L3
+inputs:
+    sealed packs
+    sealed evidence
+    accepted snapshots
+    explicit pins
+outputs:
+    reachable object set
+    removable unreachable CACHE set
+depends_on:
+    storage.artifact_classes
+    storage.pack_seal
+effects:
+    safe collection
+    protected permanent objects
+state:
+    SKLT

@@ -1,0 +1,24 @@
+schema_version:
+    1
+id:
+    storage.git_policy
+object_id:
+    storage.git_policy
+kind:
+    component
+responsibility:
+    decide which artifacts stay reviewable in Git and which leave the Git tree
+level:
+    L0
+inputs:
+    artifact kind
+    repository state
+outputs:
+    storage decision per artifact
+depends_on:
+    storage.cas
+effects:
+    visible semantic diff
+    bounded repository size
+state:
+    SKLT

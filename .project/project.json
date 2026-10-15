@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "project_id": "dungeon.system",
+  "modules": [],
+  "git_scopes": [
+    {
+      "id": "main",
+      "mode": "MONOREPO",
+      "repository": ".",
+      "root": "."
+    }
+  ],
+  "reserved_dirs": [
+    ".project",
+    "docs",
+    "evidence",
+    "libs",
+    "snapshots",
+    "tests",
+    "tools"
+  ],
+  "ignore": ["artifacts"],
+  "docs": {
+    "project": "docs/project.md",
+    "map": "docs/map.md",
+    "architecture": "docs/architecture.md",
+    "cronica": "docs/cronica"
+  },
+  "evidence_store": {
+    "type": "local-cas",
+    "root": "../DungeonStore"
+  }
+}

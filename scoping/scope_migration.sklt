@@ -1,0 +1,38 @@
+schema_version:
+    1
+id:
+    scoping.scope_migration
+object_id:
+    scoping.scope_migration
+kind:
+    component
+responsibility:
+    record movement of a level between git scopes while preserving stable identities
+level:
+    L3
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    PERMANENT
+flags:
+    - PINNED
+inputs:
+    level id
+    old and new git scope
+    old and new repository location
+outputs:
+    migration metadata
+    preserved object identities
+    unchanged history owned by Git tooling
+depends_on:
+    scoping.level_identity
+    scoping.snapshot_revisions
+effects:
+    identity preserving relocation
+    no history rewriting by the tool
+state:
+    SKLT

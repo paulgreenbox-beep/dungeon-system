@@ -1,0 +1,38 @@
+schema_version:
+    1
+id:
+    storage.storage_events
+object_id:
+    storage.storage_events
+kind:
+    component
+responsibility:
+    record machine events for object, pack, archive, restore, integrity and gc transitions
+level:
+    L4
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    PERMANENT
+flags:
+    - SEALED
+inputs:
+    storage transition
+    hash or pack id
+    reason
+outputs:
+    append only storage event
+    transition history
+depends_on:
+    storage.storage_state
+    storage.archive
+    storage.restore
+effects:
+    auditable lifecycle
+    state change provenance
+state:
+    SKLT

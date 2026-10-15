@@ -1,0 +1,38 @@
+schema_version:
+    1
+id:
+    scoping.snapshot_revisions
+object_id:
+    scoping.snapshot_revisions
+kind:
+    component
+responsibility:
+    capture the revision of every relevant git scope in a snapshot or evidence manifest
+level:
+    L2
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    PERMANENT
+flags:
+    - SEALED
+inputs:
+    git scope registry
+    repository revision
+    dirty state
+    structural hash
+outputs:
+    revision map per scope
+    explicit dirty marker
+depends_on:
+    scoping.git_scope
+    scoping.cross_scope_dependency
+effects:
+    reproducible coordinated state
+    no false clean claim
+state:
+    SKLT

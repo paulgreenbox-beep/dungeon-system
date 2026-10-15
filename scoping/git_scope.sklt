@@ -1,0 +1,36 @@
+schema_version:
+    1
+id:
+    scoping.git_scope
+object_id:
+    scoping.git_scope
+kind:
+    component
+responsibility:
+    declare which Git history a level lives in without changing level identity
+level:
+    L0
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    PERMANENT
+flags:
+    - PINNED
+inputs:
+    declared scope id
+    scope mode MONOREPO REPOSITORY or EXTERNAL
+    repository path
+    default branch
+outputs:
+    validated git scope registry
+    known scope ids
+depends_on:
+effects:
+    history boundary separated from logical identity
+    legacy projects default to main MONOREPO
+state:
+    SKLT

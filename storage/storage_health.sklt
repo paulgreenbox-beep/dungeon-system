@@ -1,0 +1,38 @@
+schema_version:
+    1
+id:
+    storage.storage_health
+object_id:
+    storage.storage_health
+kind:
+    component
+responsibility:
+    classify storage health and recommend archive and gc candidates without acting on them
+level:
+    L4
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    CACHE
+flags:
+    - GC_CANDIDATE
+inputs:
+    storage metrics
+    integrity counters
+    configured budgets
+outputs:
+    HEALTHY PRESSURE DEGRADED INCOMPLETE or CORRUPT
+    archive candidates
+    gc candidates
+depends_on:
+    storage.storage_metrics
+    storage.cas_gc
+effects:
+    policy violation detection
+    advisory candidate lists
+state:
+    SKLT

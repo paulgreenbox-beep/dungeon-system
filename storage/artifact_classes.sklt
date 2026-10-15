@@ -1,0 +1,25 @@
+schema_version:
+    1
+id:
+    storage.artifact_classes
+object_id:
+    storage.artifact_classes
+kind:
+    component
+responsibility:
+    classify every heavy artifact as PERMANENT, CACHE, EPHEMERAL or HOT
+level:
+    L1
+inputs:
+    produced artifact
+    declaration of required outputs
+outputs:
+    artifact class
+    admission decision for CAS
+depends_on:
+    storage.cas
+effects:
+    deterministic retention
+    bounded CAS growth
+state:
+    SKLT

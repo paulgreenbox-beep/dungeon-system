@@ -1,0 +1,37 @@
+schema_version:
+    1
+id:
+    storage.archive
+object_id:
+    storage.archive
+kind:
+    component
+responsibility:
+    move verified bytes to cold storage by copy, verify, register, then remove
+level:
+    L3
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    PERMANENT
+flags:
+    - SEALED
+inputs:
+    archived candidate
+    retention class
+    archive location
+outputs:
+    ARCHIVED artifact
+    updated location registry
+depends_on:
+    storage.storage_manifest
+    storage.storage_state
+effects:
+    safe movement
+    no data loss window
+state:
+    SKLT

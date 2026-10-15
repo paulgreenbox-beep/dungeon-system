@@ -1,0 +1,26 @@
+schema_version:
+    1
+id:
+    storage.pack_seal
+object_id:
+    storage.pack_seal
+kind:
+    component
+responsibility:
+    move a pack through DRAFT, VERIFIED and SEALED and forbid mutation after sealing
+level:
+    L2
+inputs:
+    pack manifest
+    declared hashes
+    verification result
+outputs:
+    pack state
+    pack identity hash
+depends_on:
+    storage.logical_pack
+effects:
+    append only packs
+    detectable tampering
+state:
+    SKLT

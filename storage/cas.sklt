@@ -1,0 +1,24 @@
+schema_version:
+    1
+id:
+    storage.cas
+object_id:
+    storage.cas
+kind:
+    component
+responsibility:
+    content addressed storage of immutable bytes outside the Git tree
+level:
+    L0
+inputs:
+    file path
+    bytes
+outputs:
+    sha256 reference
+    CAS object path
+depends_on:
+effects:
+    dedup
+    verification
+state:
+    SKLT

@@ -1,0 +1,37 @@
+schema_version:
+    1
+id:
+    storage.storage_manifest
+object_id:
+    storage.storage_manifest
+kind:
+    component
+responsibility:
+    derived registry of every stored object with retention, storage state, locations and references
+level:
+    L1
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    PERMANENT
+flags:
+    - PINNED
+inputs:
+    CAS scan
+    pack manifests
+    archive location descriptors
+outputs:
+    rebuildable storage registry
+    per object ref_count and replica locations
+depends_on:
+    storage.storage_state
+    storage.logical_pack
+effects:
+    rebuildable index
+    no duplicated authority
+state:
+    SKLT

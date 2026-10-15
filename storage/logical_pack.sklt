@@ -1,0 +1,28 @@
+schema_version:
+    1
+id:
+    storage.logical_pack
+object_id:
+    storage.logical_pack
+kind:
+    component
+responsibility:
+    group existing CAS objects by a small manifest without copying bytes
+level:
+    L1
+inputs:
+    CAS references
+    logical paths
+    pack id
+outputs:
+    pack manifest
+    grouped object list
+depends_on:
+    storage.cas
+    storage.artifact_classes
+effects:
+    deduplication
+    selective restore
+    small manifests
+state:
+    SKLT

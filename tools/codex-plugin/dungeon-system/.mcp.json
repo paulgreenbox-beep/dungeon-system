@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "dungeon-system": {
+      "command": "cmd.exe",
+      "args": ["/d", "/c", "scripts\\launch_mcp.cmd"],
+      "cwd": ".",
+      "env_vars": ["DUNGEON_PROJECT_ROOT", "DUNGEON_PYTHON"],
+      "env": {
+        "DUNGEON_WRITABLE_ROOTS": "[]"
+      }
+    }
+  }
+}

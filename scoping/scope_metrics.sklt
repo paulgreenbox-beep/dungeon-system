@@ -1,0 +1,37 @@
+schema_version:
+    1
+id:
+    scoping.scope_metrics
+object_id:
+    scoping.scope_metrics
+kind:
+    component
+responsibility:
+    collect advisory change coupling and dependency signals without taking isolation decisions
+level:
+    L4
+git_scope:
+    main
+isolation:
+    BOUNDED
+storage_state:
+    LIVE
+retention:
+    CACHE
+flags:
+    - GC_CANDIDATE
+inputs:
+    change history per scope
+    dependency graph
+    reverse dependency counts
+outputs:
+    change coupling signals
+    advisory isolation hints
+depends_on:
+    scoping.cross_scope_dependency
+    scoping.isolation
+effects:
+    evidence for decisions
+    no automatic migration
+state:
+    SKLT
