@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT))
 MAX_FILE_BYTES = 1_048_576
 SKILLS = {"dungeon-adoption", "dungeon-evidence", "dungeon-navigate",
           "dungeon-review", "dungeon-structure", "dungeon-task-trace"}
-FORBIDDEN_PREFIXES = ("artifacts/", "snapshots/", "evidence/", "DungeonStore/",
+FORBIDDEN_PREFIXES = ("artifacts/", "archive/", "snapshots/", "evidence/", "DungeonStore/",
                       "tools/codex-plugin/backups/", "tools/hardening_v041/",
                       ".git/", ".codex/", ".aws/", ".ssh/", ".venv/", "target/", "build/", "dist/")
 PUBLIC_AUDITS = {"docs/audits/README.md", "docs/audits/public-hardening-v041.md"}
@@ -54,7 +54,7 @@ def path_issues(relative: str) -> list[str]:
     devices = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
     if any(part.endswith((".", " ")) or part.split(".")[0].upper() in devices for part in path.parts):
         issues.append("unsafe-windows-path-component")
-    private_dirs = {"artifacts", "snapshots", "evidence", "dungeonstore", "__pycache__", ".git", ".codex", ".aws",
+    private_dirs = {"artifacts", "archive", "snapshots", "evidence", "dungeonstore", "__pycache__", ".git", ".codex", ".aws",
                     ".ssh", ".venv", "venv", "node_modules", "target", "build", "dist", "backups", "hardening_v041"}
     if lower.startswith(tuple(prefix.casefold() for prefix in FORBIDDEN_PREFIXES)) or any(part in private_dirs for part in components[:-1]):
         issues.append("local-environment-or-private-artifact")
@@ -68,6 +68,8 @@ def path_issues(relative: str) -> list[str]:
         issues.append("local-environment")
     if path.suffix.lower() in {".key", ".pem"} or path.name.lower() in {"credentials.json", "secrets.json", ".pypirc"}:
         issues.append("credential-file")
+    if path.name.casefold() in {"http-service.local.json", "http-service.lock"}:
+        issues.append("local-service-configuration")
     if lower.startswith(".agents/") and lower != ".agents/plugins/marketplace.json":
         issues.append("private-agent-configuration")
     return issues
@@ -237,7 +239,7 @@ def stop_owned(process):
 
 def source_hashes(root: Path):
     result = {}
-    skipped_dirs = {".git", "artifacts", "snapshots", "__pycache__", ".venv", "venv", "node_modules", "backups", "hardening_v041"}
+    skipped_dirs = {".git", "artifacts", "archive", "snapshots", "evidence", "DungeonStore", "__pycache__", ".venv", "venv", "node_modules", "backups", "hardening_v041"}
     for current, dirs, files in os.walk(root):
         dirs[:] = [name for name in dirs if name not in skipped_dirs and not (Path(current) / name).is_symlink()]
         for name in files:
@@ -296,7 +298,7 @@ def smoke(output: Path, plugin: Path | None = None) -> dict:
         raise ValueError("MCP process/protocol failure; inspect local smoke streams")
     info = replies[0]["result"]["serverInfo"]
     tool_names = [item["name"] for item in replies[2]["result"]["tools"]]
-    if info.get("version") != "0.4.1" or len(tool_names) != 30 or len(set(tool_names)) != 30:
+    if info.get("version") != manifest.get("version") or len(tool_names) != 34 or len(set(tool_names)) != 34:
         raise ValueError("MCP version/catalog mismatch")
     read_status = {name: replies[number]["result"]["structuredContent"].get("status") for number, (name, _) in enumerate(calls[:-1], 3)}
     if any(value != "PASS" for value in read_status.values()):

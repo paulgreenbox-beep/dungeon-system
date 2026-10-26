@@ -1,5 +1,15 @@
 # External operational guides
 
+## Optional version-control backends
+
+Git remains the default. Before a Scion query, inspect the explicitly declared
+VersionScope with `dungeon_vcs_status`. Read [VCS backends](vcs-backends.md) and
+the small [Scion guide](integrations/scion.md) only when that backend is involved.
+Unavailable means unavailable: do not invent a revision, silently use Git,
+start a daemon, log in, checkout, recover, commit or land. A sparse plan contains
+only declared source refs, not a verified transitive build closure. Backend
+availability, source hashes and runtime proof are separate facts.
+
 ## Rust_Makepad_Toolkit
 
 **Canonical entry point**

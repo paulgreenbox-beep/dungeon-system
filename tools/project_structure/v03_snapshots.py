@@ -21,6 +21,10 @@ def create_snapshot_v03(snapshot: ProjectSnapshot, snapshot_id: str, manifest, l
              "structural_hash": structural_hash(snapshot, manifest),
              "objects": index_data.get("objects", {}), "schema_version": 1,
              "evidence_ids": sorted(set(evidence_ids or []))}
+    from .vcs_backends import capture_revisions
+    extra["revisions_schema"] = 1
+    extra["revisions"] = capture_revisions(snapshot.root, manifest.effective_version_scopes())
+    extra["revision_consistency"] = "PER_SCOPE_OBSERVATIONS_NOT_ATOMIC"
     return create_snapshot(snapshot, snapshot_id, manifest_extra=extra)
 
 
@@ -70,6 +74,9 @@ def snapshot_diff(root: Path, old_name: str, new_name: str) -> tuple[dict[str, A
             "rare": {"before": old_grade.get("rare"), "after": new_grade.get("rare"), "delta": (new_grade.get("rare", 0) - old_grade.get("rare", 0))},
         },
     }
+    if "revisions" in old or "revisions" in new:
+        result["revisions"] = {"before": old.get("revisions"), "after": new.get("revisions"),
+                               "atomic": False}
     return result, issues
 
 

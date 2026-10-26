@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from .model import DEFAULT_GIT_SCOPE, GIT_SCOPE_MODES, Issue
@@ -11,7 +12,7 @@ from .model import DEFAULT_GIT_SCOPE, GIT_SCOPE_MODES, Issue
 
 SUPPORTED_MANIFEST_SCHEMA = 1
 DEFAULT_RESERVED = frozenset({"docs", "evidence", "libs", "snapshots", "tools", "tests", ".project"})
-DEFAULT_IGNORED = frozenset({".git", "target", ".codex", ".agents", "__pycache__"})
+DEFAULT_IGNORED = frozenset({".git", ".scion", "target", ".codex", ".agents", "__pycache__"})
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,7 @@ class ProjectManifest:
     docs: dict[str, str] = field(default_factory=dict)
     evidence_store: dict[str, str] | None = None
     git_scopes: list[GitScope] = field(default_factory=list)
+    version_scopes: list[Any] = field(default_factory=list)
     exists: bool = False
 
     @property
@@ -64,7 +66,18 @@ class ProjectManifest:
         return self.root / ".project" / "project.json"
 
     def known_git_scopes(self) -> set[str]:
-        return {scope.scope_id for scope in self.git_scopes} or {DEFAULT_GIT_SCOPE}
+        # Compatibility name: SKLT git_scope remains a stable history-scope pointer.
+        return {scope.scope_id for scope in self.effective_version_scopes()}
+
+    def effective_version_scopes(self) -> list[Any]:
+        from .vcs_backends import VersionScope
+
+        legacy = self.git_scopes
+        if not legacy and not any(scope.scope_id == DEFAULT_GIT_SCOPE for scope in self.version_scopes):
+            legacy = [default_git_scope()]
+        return [VersionScope(scope_id=s.scope_id, backend="GIT", root=s.root,
+                             mode=s.mode, repository=s.repository, default_ref=s.default_branch)
+                for s in legacy] + list(self.version_scopes)
 
 
 def load_manifest(root: Path) -> tuple[ProjectManifest, list[Issue]]:
@@ -158,6 +171,43 @@ def load_manifest(root: Path) -> tuple[ProjectManifest, list[Issue]]:
                 remote=item.get("remote") if isinstance(item.get("remote"), str) else None,
             ))
 
+    # Optional additive extension; old manifests and GitScope serialization are unchanged.
+    # Credentials, executables and transport commands are deliberately not manifest fields.
+    version_scopes = data.get("version_scopes", [])
+    if not isinstance(version_scopes, list):
+        issues.append(Issue("INVALID_VERSION_SCOPE", "version_scopes must be an array", path))
+    else:
+        from .vcs_backends import VersionScope
+        seen = {scope.scope_id for scope in manifest.git_scopes}
+        allowed = {"id", "backend", "root", "mode", "repository", "default_ref", "endpoint_profile"}
+        for item in version_scopes:
+            valid = isinstance(item, dict) and not (set(item) - allowed)
+            if valid:
+                scope_id, backend = item.get("id"), item.get("backend", "GIT")
+                valid = (isinstance(scope_id, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", scope_id)
+                         and backend in ("GIT", "SCION"))
+            if valid:
+                scope_root = item.get("root", ".")
+                repository = item.get("repository", scope_root)
+                profile = item.get("endpoint_profile")
+                mode = item.get("mode", "MONOREPO")
+                default_ref = item.get("default_ref")
+                valid = (isinstance(mode, str) and mode in GIT_SCOPE_MODES and isinstance(scope_root, str)
+                         and isinstance(repository, str)
+                         and all(_local_scope_path(value) for value in (scope_root, repository))
+                         and (profile is None or (isinstance(profile, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", profile)))
+                         and (default_ref is None or (isinstance(default_ref, str) and 0 < len(default_ref) <= 256
+                                                      and not any(ord(c) < 32 for c in default_ref))))
+            if not valid:
+                issues.append(Issue("INVALID_VERSION_SCOPE", "invalid version scope fields, backend, local path or endpoint profile", path))
+                continue
+            if scope_id in seen:
+                issues.append(Issue("DUPLICATE_VERSION_SCOPE", f"duplicate version scope id: {scope_id}", path))
+                continue
+            seen.add(scope_id)
+            manifest.version_scopes.append(VersionScope(scope_id=scope_id, backend=backend, root=scope_root,
+                repository=repository, mode=mode, default_ref=default_ref, endpoint_profile=profile))
+
     modules = data.get("modules", [])
     if not isinstance(modules, list):
         issues.append(Issue("INVALID_PROJECT_MANIFEST", "modules must be an array", path))
@@ -184,6 +234,15 @@ def load_manifest(root: Path) -> tuple[ProjectManifest, list[Issue]]:
                 recursive = True
             manifest.modules.append(ExplicitModule(module_id, module_path, bool(item.get("allow_reserved", False)), recursive))
     return manifest, issues
+
+
+def _local_scope_path(value: str) -> bool:
+    normal = value.replace("\\", "/")
+    return (bool(normal) and normal == normal.strip() and len(normal) <= 4096 and not normal.startswith("/")
+            and not any(part in ("..", "") for part in normal.split("/"))
+            and not any(part != "." and (part.endswith((" ", ".")) or PureWindowsPath(part).is_reserved())
+                        for part in normal.split("/"))
+            and not any(ord(c) < 32 or c == ":" for c in normal))
 
 
 def relative_path(root: Path, path: Path) -> str | None:

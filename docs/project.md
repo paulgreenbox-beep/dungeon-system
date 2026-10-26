@@ -17,6 +17,8 @@ inspect → SKLT → Task Trace
     ↓
 declared GLIF, source/test refs → source-link audit
     ↓
+declared VersionScope → backend-supported revision/history queries
+    ↓
 Rust_Makepad_Toolkit/docs/INDEX.md, если нужна external capability
     ↓
 Toolkit verification → Evidence / CAS
@@ -44,6 +46,8 @@ status → inspect → SKLT → execution ref
 Агент не придумывает команду запуска контейнера и не переносит его runtime в Dungeon System. Runtime failure контейнера не маскируется structural правками.
 
 ## Где что находится
+
+VersionScope описывает backend истории исходников; Git остаётся default. Для Scion используй только подтверждённые read-only show/log queries и сохраняй неизвестное состояние как UNKNOWN. Подробные ограничения, формат revisions, snapshots и evidence собраны в [VCS backends](vcs-backends.md) и [Scion integration](integrations/scion.md). Runtime-002 gates A-C прошли на disposable Linux/TestCluster fixture; gate D подтверждён installed launcher и новой Codex CLI-сессией с 34 tools. Windows capture остаётся `CAPTURED_UNSEALED` из-за `SOURCE_REVISION_UNKNOWN`, а не подтверждением текущего proof: см. [runtime report](integrations/scion-runtime-002-report.md).
 
 - MCP v0.4 и onboarding: [plugin guide](../tools/codex-plugin/dungeon-system/README.md).
 - `project-probe` диагностирует также `INVALID_MANAGED` и `UNAVAILABLE`; выдаёт structured issues и next steps.
@@ -81,7 +85,7 @@ Dungeon System отвечает на вопросы **что** и **где**: ob
 
 ## Evidence Store
 
-evidence/manifests/ связывает object_id, Git state, snapshot, Toolkit execution ref, CAS inputs/artifacts и result. Тяжёлые точные байты лежат во внешнем CAS; в Git остаются manifests и seals. Store root задаётся в .project/project.json, сейчас относительным путём ../DungeonStore. Недоступность CAS не меняет результат structural validation.
+evidence/manifests/ связывает object_id, Git state или typed source revision, snapshot, Toolkit execution ref, CAS inputs/artifacts и result. Тяжёлые точные байты лежат во внешнем CAS; в Git остаются manifests и seals. Store root задаётся в .project/project.json, сейчас относительным путём ../DungeonStore. Недоступность CAS не меняет результат structural validation.
 
 Начальный workflow и формат: [docs/evidence.md](evidence.md). CAS immutable по SHA-256. Evidence seal фиксирует hash manifest; после seal новая попытка получает новый ID. Snapshot хранит только структурное состояние и ссылки на evidence IDs.
 

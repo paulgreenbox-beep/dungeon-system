@@ -7,7 +7,7 @@ object_id:
 kind:
     component
 responsibility:
-    declare which Git history a level lives in without changing level identity
+    declare a VersionScope history boundary with legacy GitScope compatibility without changing level or object identity
 level:
     L0
 git_scope:
@@ -25,12 +25,20 @@ inputs:
     scope mode MONOREPO REPOSITORY or EXTERNAL
     repository path
     default branch
+    optional explicit VersionScope backend GIT or SCION
+    local endpoint profile name without credentials
 outputs:
     validated git scope registry
     known scope ids
+    namespaced revision observations independent of Dungeon CAS
 depends_on:
 effects:
     history boundary separated from logical identity
     legacy projects default to main MONOREPO
+    Scion is opt-in and unavailable state never falls back to Git
+source:
+    path: tools/project_structure/v03_manifest.py
+    path: tools/project_structure/vcs_backends.py
+    path: tools/project_structure/vcs_service.py
 state:
     SKLT

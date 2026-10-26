@@ -4,22 +4,35 @@ Codex MCP plugin for structural navigation and evidence in existing repositories
 
 Copyright © 2026 Киселюк Павел Геннадьевич. Licensed under the MIT License; see [the bundled license](LICENSE).
 
-> **Release status:** tag `v0.4.1-rc1` is a prerelease. Independent re-audit is pending; this release is **not independently verified**.
+> **Source status: v0.4.2-rc1 — Runtime-tested / Experimental / Independent audit pending.** The existing `v0.4.1-rc1` tag remains the older prerelease; no new Release or tag is created for this source update.
 
 ## Package contents
+
+Optional opt-in transport: `mcp/http_service.py` provides a shared localhost
+Streamable HTTP coordinator with a fixed process pool, scoped client sessions
+and a bounded queue. The same `server.py` handlers and schemas are reused.
+The stdio launcher and `.mcp.json` remain the default and are unchanged.
+HTTP requires `requirements-http.txt`. A dedicated Windows environment passed
+48 MCP tests, including a real two-client read-only HTTP canary; see the
+[bounded validation report](../../../docs/integrations/dungeon-shared-http-validation.md).
+No Codex settings or live MCP connections were switched. Do not migrate until the
+[HTTP acceptance/migration guide](../../../docs/integrations/dungeon-shared-http.md)
+has been followed by an operator. Examples are templates, not active settings.
 
 - `mcp/server.py` implements the MCP bridge with the Python standard library and imports the project CLI from `tools/project_structure` in the full source clone.
 - `scripts/launch_mcp.cmd` selects a Python executable on Windows; `DUNGEON_PYTHON` can select it explicitly.
 - `skills/` contains six Codex skills: `dungeon-adoption`, `dungeon-evidence`, `dungeon-navigate`, `dungeon-review`, `dungeon-structure`, and `dungeon-task-trace`.
-- The plugin preserves all 30 existing MCP tool names.
+- The `0.4.2-rc1` source candidate declares 34 stdio MCP tools: the original 30 plus four experimental, read-only VersionScope queries. It retains six skills. The public `v0.4.1-rc1` tag remains at 30 tools. Source discovery is not installed-session discovery; see the [runtime report](../../../docs/integrations/scion-runtime-002-report.md) for the separately verified activation result.
 
 This package requires a **full clone** of the public repository and Python 3.11+:
 
 ```powershell
 git clone https://github.com/paulgreenbox-beep/dungeon-system.git Dungeon-System
 Set-Location Dungeon-System
-git checkout v0.4.1-rc1
+git checkout main
 ```
+
+The existing `v0.4.1-rc1` tag is the 30-tool baseline; check it out only to reproduce that older version. The 34-tool count above applies to the `0.4.2-rc1` source on `main`. The recorded installed `0.4.2-rc1` package and a fresh Codex CLI session separately exposed 34 tools; an already-open chat may retain an older catalog. See the [runtime/activation report](../../../docs/integrations/scion-runtime-002-report.md). Source publication is not a new Release/tag or independent acceptance.
 
 A plugin copied or installed into a Codex cache does not contain the CLI source that the MCP server imports. Keep the clone available and set `DUNGEON_PROJECT_ROOT` to its absolute root even when Codex loads the plugin from a cache. The plugin declares `env_vars` to forward that variable and optional `DUNGEON_PYTHON` through Codex's environment filter; it contains no machine-specific checkout value. For every other repository, pass that repository's absolute `project_root` explicitly.
 
@@ -38,6 +51,23 @@ $pythonPath = (Get-Command python).Source
 ```
 
 Restart Codex after changing per-user environment values. Keeping `DUNGEON_WRITABLE_ROOTS` as `[]` preserves read-only behavior.
+
+### Optional Scion profile (experimental)
+
+Scion is an experimental Linux adapter path. Bounded real-CLI/TestCluster gates A-C passed in a disposable native-ext4 fixture under Ubuntu WSL; this does not establish production readiness or general WSL/DrvFS support. The separate Windows mirror capture remained safely unsealed because the source revision was unknown. The bundled `.mcp.json` `env_vars` allowlist forwards only `DUNGEON_PROJECT_ROOT` and `DUNGEON_PYTHON`. If an operator configures a Scion profile for a Linux MCP server, explicitly add the required per-profile names to that server's `env_vars` list, for example:
+
+```json
+"env_vars": [
+  "DUNGEON_PROJECT_ROOT",
+  "DUNGEON_PYTHON",
+  "DUNGEON_SCION_LAB_ENDPOINT",
+  "DUNGEON_SCION_LAB_TOKEN",
+  "DUNGEON_SCION_LAB_CA_FILE",
+  "DUNGEON_SCION_LAB_TRANSPORT"
+]
+```
+
+Then provide the endpoint, token, optional CA path, and Linux-native transport to the MCP process through the operator's secure environment/secret mechanism. Without the explicit MCP allowlist, variables in the parent Codex environment do not reach the child server. `DUNGEON_SCION_LAB_DISTRIBUTION` is reserved and unused. Never commit secret values or place a token in command arguments; no OpenAI API key is required. See [Scion integration and its runtime check](../../../docs/integrations/scion.md).
 
 ## Install options
 
@@ -131,6 +161,15 @@ The October 12 hardening gate and October 15 local baseline each ran 234 cases:
 233 PASS, no FAIL/ERROR, one Windows symlink-privilege SKIP. These historical
 totals exclude new publication checks and public-clone private-packet skips.
 Independent re-audit is pending. See the [public hardening summary](../../../docs/audits/public-hardening-v041.md).
+
+Regression-01 for the `0.4.2-rc1` candidate ran 322 cases: 320 PASS, two
+SKIP (Windows error 1314 in the original case and the new plugin-backup case),
+zero FAIL/ERROR; inputs were unchanged. The 16/16 pre-activation cache backup
+verification is recorded at
+`tools/codex-plugin/backups/dungeon-system-before-activation-20261016T082600Z`.
+Installed-cache and fresh-session discovery are separate checks. See
+the [runtime check](../../../docs/integrations/scion-runtime-check.md) and
+[runtime report](../../../docs/integrations/scion-runtime-002-report.md).
 
 The public release-check workflow is:
 

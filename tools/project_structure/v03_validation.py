@@ -97,7 +97,7 @@ def _git_scope_issues(snapshot: ProjectSnapshot, manifest: ProjectManifest) -> l
     for record in snapshot.sklts:
         scope = record.git_scope
         if scope and scope not in known:
-            issues.append(Issue("UNKNOWN_GIT_SCOPE", f"git_scope '{scope}' is not declared in git_scopes", record.path))
+            issues.append(Issue("UNKNOWN_GIT_SCOPE", f"git_scope '{scope}' is not declared in git_scopes or version_scopes", record.path))
     return issues
 
 
@@ -165,6 +165,7 @@ def status_data(snapshot: ProjectSnapshot, manifest: ProjectManifest, libraries:
             "declared": [scope.as_dict() for scope in manifest.git_scopes],
             "effective": sorted(manifest.known_git_scopes()),
         },
+        "version_scopes": [scope.as_dict() for scope in manifest.effective_version_scopes()],
         "storage_axes": {
             "structural": {"SKLT": sum(record.state == "SKLT" for record in snapshot.sklts), "RARE": sum(record.state == "RARE" for record in snapshot.sklts)},
             "storage_state": dict(sorted(storage_states.items())),

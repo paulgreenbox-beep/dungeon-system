@@ -1,4 +1,5 @@
 __pycache__/
+.scion/
 *.py[cod]
 .pytest_cache/
 *.dpack
@@ -79,3 +80,10 @@ secrets.json
 !/.agents/plugins/
 /.agents/plugins/*
 !/.agents/plugins/marketplace.json
+
+# Local cold storage: never publish archived fixtures or private receipts.
+/archive/
+
+# Optional shared HTTP service: local operator config, OS lease and credentials.
+**/http-service.local.json
+/.project/http-service.lock

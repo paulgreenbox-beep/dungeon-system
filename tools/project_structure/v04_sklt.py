@@ -282,6 +282,7 @@ def read_sklt(root: Path, entry: dict) -> tuple[list[dict], SkltRecord | None, l
             "object_id": canonical.object_id, "identity_origin": "OBJECT_ID", "module": entry["module"],
             "sklt": relative, "state": canonical.state, "dependencies": [],
             "source": [ref.as_dict() for ref in sources], "glif": [], "dialect": "CANONICAL",
+            "git_scope": canonical.git_scope, "level": canonical.level,
             "line_start": 1, "line_end": max(1, len(text.splitlines())),
         }], canonical, issues
     records, issues = parse_declarations(path, text, relative, entry["module"])

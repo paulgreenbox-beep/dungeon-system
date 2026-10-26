@@ -244,6 +244,11 @@ def _draft_errors(draft: dict[str, Any]) -> list[str]:
 
 def _link_errors(data: dict[str, Any], *, captured: bool) -> list[str]:
     errors: list[str] = []
+    if "source_revision" in data:
+        from .vcs_service import provenance_errors
+        errors.extend(provenance_errors(data["source_revision"]))
+        if not isinstance(data.get("source"), dict) or not data["source"].get("files"):
+            errors.append("typed source revisions require captured source files, not only a server base")
     inputs = data.get("inputs") if isinstance(data.get("inputs"), dict) else {}
     if "task_id" in data and (not isinstance(data["task_id"], str) or not TASK_ID_RE.fullmatch(data["task_id"])):
         errors.append("task_id must be a stable external task reference")
@@ -335,7 +340,7 @@ def _capture_links(root: Path, draft: dict[str, Any], git: dict[str, Any], input
     return links
 
 
-def _current_link_issues(root: Path, data: dict[str, Any]) -> list[Issue]:
+def _current_link_issues(root: Path, data: dict[str, Any], *, check_typed_revision: bool = True) -> list[Issue]:
     issues: list[Issue] = []
     for label, records in (("BUILD", [data["build"]] if "build" in data else []), ("SOURCE", data.get("source", {}).get("files", []))):
         for record in records:
@@ -345,7 +350,15 @@ def _current_link_issues(root: Path, data: dict[str, Any]) -> list[Issue]:
                     issues.append(Issue(f"{label}_HASH_MISMATCH", f"current bytes differ: {record['path']}"))
             except EvidenceError as exc:
                 issues.append(Issue(f"{label}_UNAVAILABLE", str(exc)))
-    if "source" in data or "build" in data:
+    if "source_revision" in data and check_typed_revision:
+        from .vcs_service import object_revisions, provenance_matches
+        try:
+            current = object_revisions(root, data["objects"])
+            if not provenance_matches(data["source_revision"], current):
+                issues.append(Issue("SOURCE_REVISION_UNKNOWN", "typed source revisions are changed, dirty-state unknown or unavailable; not current proof"))
+        except (ValueError, OSError):
+            issues.append(Issue("SOURCE_REVISION_UNKNOWN", "current typed source revision cannot be established"))
+    elif "source_revision" not in data and ("source" in data or "build" in data):
         revision = data["source"]["revision"] if "source" in data else data.get("git", {}).get("commit")
         if revision != data.get("git", {}).get("commit") or revision != _git_state(root)["commit"]:
             issues.append(Issue("SOURCE_REVISION_MISMATCH", "captured source revision differs from manifest Git or current HEAD"))
@@ -537,7 +550,26 @@ def _create_evidence(root: Path, draft_path: Path, *, draft: dict[str, Any] | No
     if snapshot_id is not None and snapshot_id not in _snapshot_ids(root):
         return None, [Issue("UNKNOWN_EVIDENCE_SNAPSHOT", f"unknown structural snapshot '{snapshot_id}'")]
 
-    git = _git_state(root)
+    typed_revision = None
+    if project_manifest.version_scopes or "source_revision" in draft:
+        from .vcs_service import object_revisions, provenance_equivalent
+        try:
+            typed_revision = object_revisions(root, draft["objects"])
+        except (OSError, ValueError) as exc:
+            return None, [Issue("EVIDENCE_CAPTURE_MISMATCH", str(exc))]
+        # Merely enabling Scion elsewhere must not change existing root-Git
+        # Evidence/receipt behavior for objects still in the legacy main scope.
+        if ("source_revision" not in draft and set(typed_revision["scopes"]) == {"main"}
+                and typed_revision["scopes"]["main"]["backend"] == "GIT"
+                and any(s.scope_id == "main" and s.backend == "GIT" and s.root == "."
+                        for s in project_manifest.effective_version_scopes())):
+            typed_revision = None
+    if typed_revision is not None:
+        if not isinstance(draft.get("source"), dict) or not draft["source"].get("files"):
+            return None, [Issue("EVIDENCE_CAPTURE_MISMATCH", "VersionScope evidence requires non-empty source files captured into CAS")]
+        if "source_revision" in draft and not provenance_equivalent(draft["source_revision"], typed_revision):
+            return None, [Issue("EVIDENCE_CAPTURE_MISMATCH", "caller source_revision differs from captured backend state")]
+    git = _git_state(root) if typed_revision is None else {"commit": None, "dirty": None}
     try:
         from .v041_proof import skeleton_obligation_sha256
         obligation_hashes = {identity: skeleton_obligation_sha256(root, known_objects[identity]["sklt"]) for identity in draft["objects"]}
@@ -560,8 +592,9 @@ def _create_evidence(root: Path, draft_path: Path, *, draft: dict[str, Any] | No
         "artifacts": dict(artifacts),
         "result": dict(draft["result"]),
         **links,
+        **({"source_revision": typed_revision} if typed_revision is not None else {}),
     }
-    link_issues = _current_link_issues(root, payload)
+    link_issues = _current_link_issues(root, payload, check_typed_revision=False)
     if link_issues:
         return None, link_issues
     errors = _manifest_errors(payload)
@@ -674,7 +707,7 @@ def _verify_evidence_integrity(root: Path, evidence_id: str) -> dict[str, Any]:
         issues.extend(_seal_errors(root, evidence_id, data, seal))
     errors = [issue for issue in issues if issue.code != "UNRESOLVED_TOOLKIT_REF"]
     state = "BROKEN" if errors else ("SEALED" if sealed else "VERIFIED")
-    freshness = {"SOURCE_HASH_MISMATCH", "BUILD_HASH_MISMATCH", "SOURCE_UNAVAILABLE", "BUILD_UNAVAILABLE", "SOURCE_REVISION_MISMATCH"}
+    freshness = {"SOURCE_HASH_MISMATCH", "BUILD_HASH_MISMATCH", "SOURCE_UNAVAILABLE", "BUILD_UNAVAILABLE", "SOURCE_REVISION_MISMATCH", "SOURCE_REVISION_UNKNOWN"}
     integrity_state = "BROKEN" if any(item.code not in freshness for item in errors) else ("SEALED" if sealed else "VERIFIED")
     return {
         "evidence_id": evidence_id,

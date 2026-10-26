@@ -58,6 +58,29 @@ def build_parser() -> argparse.ArgumentParser:
         command = subparsers.add_parser(name, help=description)
         _add_root_argument(command, suppressed=True)
         _add_json_argument(command, suppressed=True)
+    vcs_commands = {
+        "vcs-status": "read the status of a declared version-control scope",
+        "vcs-inspect": "inspect a version-control revision",
+        "vcs-history": "read bounded version-control history",
+        "vcs-diff": "read a version-control diff",
+        "vcs-sparse-plan": "plan a sparse version-control checkout",
+        "vcs-migration-plan": "plan migration to a version-control backend",
+    }
+    for name, description in vcs_commands.items():
+        command = subparsers.add_parser(name, help=description)
+        _add_root_argument(command, suppressed=True)
+        _add_json_argument(command, suppressed=True)
+        command.add_argument("--scope", dest="scope_id", help="declared version-control scope ID")
+        if name in {"vcs-inspect", "vcs-history"}:
+            command.add_argument("--revision", help="revision to inspect")
+        if name == "vcs-history":
+            command.add_argument("--limit", type=int, choices=range(1, 101), default=20,
+                                 help="maximum history entries (1..100; default: 20)")
+        if name == "vcs-sparse-plan":
+            command.add_argument("--object-id", required=True, help="logical object ID to plan for")
+        if name == "vcs-migration-plan":
+            command.add_argument("--target-backend", required=True, choices=("GIT", "SCION"),
+                                 help="destination version-control backend")
     inspect = subparsers.add_parser("inspect", help="inspect one object by object_id")
     _add_root_argument(inspect, suppressed=True)
     _add_json_argument(inspect, suppressed=True)
@@ -387,6 +410,46 @@ def _run_snapshot(root: Path, name: str, as_json: bool, evidence_ids: list[str] 
     return 0
 
 
+def _run_vcs(root: Path, args, as_json: bool) -> int:
+    from .vcs_service import vcs_query
+
+    operations = {
+        "vcs-status": "status",
+        "vcs-inspect": "inspect",
+        "vcs-history": "history",
+        "vcs-diff": "diff",
+        "vcs-sparse-plan": "sparse-plan",
+        "vcs-migration-plan": "migration-plan",
+    }
+    payload = vcs_query(
+        root,
+        operations[args.command],
+        scope_id=getattr(args, "scope_id", None),
+        revision=getattr(args, "revision", None),
+        limit=getattr(args, "limit", 20),
+        object_id=getattr(args, "object_id", None),
+        target_backend=getattr(args, "target_backend", None),
+    )
+    status = payload.get("status") if isinstance(payload, dict) else None
+    if status not in {"PASS", "PARTIAL", "FAIL"}:
+        payload = {
+            "status": "FAIL",
+            "issues": [{"code": "INVALID_VCS_RESULT", "severity": "ERROR",
+                        "message": "VCS service returned an invalid result."}],
+        }
+        status = "FAIL"
+    payload.setdefault("issues", [])
+    if as_json:
+        _emit(payload, True)
+    else:
+        print(f"{args.command}: {status}")
+        for key, value in payload.items():
+            if key == "status":
+                continue
+            print(f"{key}: {json.dumps(value, ensure_ascii=False, indent=2)}")
+    return 0 if status == "PASS" else 1
+
+
 def _resolve_input_path(root: Path, path: Path) -> Path:
     return path.resolve() if path.is_absolute() else (root / path).resolve()
 
@@ -551,6 +614,9 @@ def _dispatch(args, root) -> int:
         return _run_inspect(root, args.object_id, as_json)
     if args.command == "status":
         return _run_status(root, as_json)
+    if args.command in {"vcs-status", "vcs-inspect", "vcs-history", "vcs-diff",
+                        "vcs-sparse-plan", "vcs-migration-plan"}:
+        return _run_vcs(root, args, as_json)
     if args.command == "snapshot":
         return _run_snapshot(root, args.name, as_json, args.evidence_id)
     if args.command == "snapshot-diff":

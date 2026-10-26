@@ -8,6 +8,16 @@
 - `libs/` содержит external/reusable dependencies и не является обычным project module.
 - `docs/`, `snapshots/`, `libs/`, `tools/` и `tests/` не учитываются в EXP.
 
+## VersionScope and source history
+
+Git remains the default backend. Existing GitScope records and the SKLT git_scope field remain compatibility pointers; their identifiers and all LevelId/ObjectId identities stay stable. The implicit Git scope `main` exists only when neither `git_scopes` nor `version_scopes` explicitly declares scope ID `main`. VersionScope is a history boundary, not a structural or module identity, and does not change EXP or grade semantics.
+
+The optional version_scopes manifest field is additive. Its strict entries name a backend, a project-relative root and repository, a mode, and optional default_ref/endpoint_profile values. Credentials, executable commands, and external roots do not belong in the manifest. See [VCS backends](vcs-backends.md) for the shape and [Scion integration](integrations/scion.md) for current capability limits.
+
+Scion is experimental and opt-in. The pinned adapter may query Scion show/log JSON v1; its local working-copy base does not establish the current server ref or a clean tree. Scion status and working-copy diff remain unavailable as safe read-only operations, so dirty state stays UNKNOWN and a typed revision cannot establish VERIFIED proof. Never silently fall back to Git or run checkout, login, commit, land, or migration during inspection.
+
+Runtime-002 passed its bounded upstream CLI and Linux/TestCluster gates (A-C) on a disposable native-ext4 fixture; this is not production or general WSL/DrvFS acceptance. The Windows mirror capture remained `CAPTURED_UNSEALED` with `SOURCE_REVISION_UNKNOWN`; verified CAS bytes and a local Scion base do not establish current proof. Gate D separately passed installed-launcher and fresh Codex CLI-session discovery/calls. See the [runtime report](integrations/scion-runtime-002-report.md); independent acceptance remains separate.
+
 ## External execution boundary
 
 External execution capabilities are referenced, not reimplemented.
@@ -29,6 +39,8 @@ Dungeon System не реализует agent roles, runtime workflow, package ma
 - Cronica объясняет, почему менялась структура.
 - Snapshot фиксирует structural state и может хранить evidence IDs.
 - Evidence Manifest связывает objects, Git, snapshot, Toolkit capability, result и CAS references.
+- Snapshot revisions are an additive schema-1 extension keyed by VersionScope; observations across backends are coordinated logically, not atomically.
+- Typed source_revision evidence can coexist with legacy Git provenance. The accepted legacy root-main Git receipt path remains unchanged even when Scion is configured elsewhere; typed Scion/nonlegacy VersionScope receipts fail closed as `VCS_PROOF_ADAPTER_UNSUPPORTED`. Every explicitly captured source file is independently hashed and stored in Dungeon CAS; unknown Scion state cannot promote coverage to VERIFIED.
 - Внешний local CAS хранит immutable exact bytes, доступные по SHA-256.
 - Sealed manifest и seal append-only; CAS bytes не перезаписываются.
 - Derived search indexes остаются восстанавливаемыми и не становятся authority.

@@ -1,7 +1,7 @@
 {
   "name": "dungeon-system",
-  "version": "0.4.1",
-  "description": "Project diagnosis, safe adoption, SKLT navigation, task traces and build-specific evidence with separate Prototype/Product coverage.",
+  "version": "0.4.2-rc1",
+  "description": "Project diagnosis, safe adoption, SKLT navigation, task traces, build evidence, and experimental Git/Scion version-scope inspection.",
   "author": {
     "name": "Киселюк Павел Геннадьевич"
   },

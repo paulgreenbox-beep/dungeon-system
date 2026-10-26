@@ -130,6 +130,12 @@ def _manifest(root: Path) -> tuple[ProjectManifest, dict | None, list[dict]]:
                     checked_path(root, value)
                 except (OSError, ValueError) as exc:
                     issues.append(issue("INVALID_CONFIG_PATH", str(exc), relative))
+        for scope in manifest.version_scopes:
+            for value in (scope.root, scope.repository):
+                try:
+                    checked_path(root, value)
+                except (OSError, ValueError) as exc:
+                    issues.append(issue("INVALID_CONFIG_PATH", str(exc), relative))
         return manifest, raw, issues
     except (OSError, UnicodeError, ValueError) as exc:
         # A broken link/directory in the manifest location is a bad configuration,

@@ -34,7 +34,7 @@ _PRIORITY = {state: index for index, state in enumerate(PROOF_STATES)}
 RUNTIME_TYPES = frozenset(("runtime", "executable", "ui"))
 _ASSERTIONS = frozenset(("assert_visible", "assert_interactable", "assert_valid_bounds", "windows_assert_automation_ids"))
 _NONPASS = frozenset(("FAIL", "FAILED", "SKIPPED", "UNKNOWN", "NOT_RUN", "PARTIAL"))
-_FRESHNESS = frozenset(("SOURCE_HASH_MISMATCH", "BUILD_HASH_MISMATCH", "SOURCE_UNAVAILABLE", "BUILD_UNAVAILABLE", "SOURCE_REVISION_MISMATCH"))
+_FRESHNESS = frozenset(("SOURCE_HASH_MISMATCH", "BUILD_HASH_MISMATCH", "SOURCE_UNAVAILABLE", "BUILD_UNAVAILABLE", "SOURCE_REVISION_MISMATCH", "SOURCE_REVISION_UNKNOWN"))
 
 
 def skeleton_obligation_sha256(root: Path, sklt: str) -> str:
@@ -293,9 +293,11 @@ def evaluate_proof(root: Path, record: dict[str, Any], obj: dict[str, Any] | Non
         executable = record.get("executable_path")
         revision = ev._git_state(root)["commit"]
         for ref in refs:
-            row = trace_api._audit_ref(root, ref, revision)
+            row = trace_api._audit_ref(root, ref, revision, obj.get("git_scope") or "main")
             if row["file_state"] != "CURRENT":
                 reject("STALE", "SOURCE_LINK_STALE", "declared source/test reference changed or disappeared")
+            if isinstance(ref.get("source_revision"), dict) and row.get("revision_state") != "CURRENT":
+                reject("INCOMPLETE", "SOURCE_REVISION_UNKNOWN", "typed source/test reference is not a current observation")
             if ref.get("type") in RUNTIME_TYPES or ref["path"].lower().endswith(".exe"):
                 if executable is None:
                     executable = ref["path"]
@@ -305,6 +307,8 @@ def evaluate_proof(root: Path, record: dict[str, Any], obj: dict[str, Any] | Non
                 source_paths.append(ref["path"])
         obligation = skeleton_obligation_sha256(root, obj["sklt"])
         project, project_issues = load_manifest(root)
+        selected_scope = next((item for item in project.effective_version_scopes()
+                               if item.scope_id == (obj.get("git_scope") or "main")), None)
         runtime = any(c.get("type") in RUNTIME_TYPES for c in required + performed)
         for evidence_id in evidence_ids:
             verification = ev._verify_evidence_integrity(root, evidence_id)
@@ -342,6 +346,16 @@ def evaluate_proof(root: Path, record: dict[str, Any], obj: dict[str, Any] | Non
                 reject("STALE", "SKELETON_OBLIGATION_CHANGED", "current full SKLT obligation differs from captured contract")
             source = data.get("source", {})
             captured_revision = source.get("revision")
+            if (selected_scope is None or selected_scope.backend != "GIT" or selected_scope.root != ".") and "source_revision" not in data:
+                reject("CONFLICT", "SOURCE_REVISION_BACKEND_MISMATCH", "legacy root-Git evidence does not bind this VersionScope")
+            if "source_revision" in data:
+                # Existing receipt adapters bind Git strings. Do not silently treat a
+                # Scion BLAKE3 changeset as Git or bless a dirty/unknown server base.
+                from .vcs_service import object_revisions, provenance_matches
+                current_versions = object_revisions(root, data["objects"])
+                if not provenance_matches(data["source_revision"], current_versions):
+                    reject("INCOMPLETE", "SOURCE_REVISION_UNKNOWN", "typed source revision or dirty state is unavailable")
+                reject("INCOMPLETE", "VCS_PROOF_ADAPTER_UNSUPPORTED", "versioned multi-backend execution receipt adapter has not been accepted")
             if not isinstance(captured_revision, str) or not ev.REVISION_RE.fullmatch(captured_revision) or captured_revision != revision:
                 reject("STALE" if captured_revision and revision else "INCOMPLETE", "SOURCE_REVISION_UNKNOWN", "exact current source revision is required")
             files = source.get("files", [])

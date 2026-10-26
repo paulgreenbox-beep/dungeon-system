@@ -19,7 +19,7 @@
     "tests",
     "tools"
   ],
-  "ignore": ["artifacts"],
+  "ignore": ["artifacts", "archive"],
   "docs": {
     "project": "docs/project.md",
     "map": "docs/map.md",

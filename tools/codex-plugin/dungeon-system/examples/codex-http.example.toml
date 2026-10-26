@@ -1,0 +1,7 @@
+# OPERATOR TEMPLATE ONLY. Nothing in the installed plugin is changed by this file.
+# Use after acceptance checks, not alongside an enabled legacy Dungeon writer.
+[mcp_servers.dungeon_shared]
+url = "http://127.0.0.1:8768/mcp"
+bearer_token_env_var = "DUNGEON_HTTP_CODEX_TOKEN"
+startup_timeout_sec = 15
+tool_timeout_sec = 55

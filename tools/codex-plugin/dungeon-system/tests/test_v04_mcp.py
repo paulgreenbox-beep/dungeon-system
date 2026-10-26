@@ -217,7 +217,7 @@ class McpV04Integration(unittest.TestCase):
         tools = json.loads(result.stdout)["result"]["tools"]
         names = [tool["name"] for tool in tools]
         self.assertEqual(len(names), len(set(names)))
-        self.assertEqual(len(names), 30)
+        self.assertEqual(len(names), 34)
         for tool in tools:
             self.assertGreater(len(tool["description"]), 40)
             self.assertEqual(tool["inputSchema"]["type"], "object")

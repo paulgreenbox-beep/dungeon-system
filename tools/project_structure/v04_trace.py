@@ -174,7 +174,13 @@ def _refs(root: Path, values: Any, label: str) -> list[dict[str, Any]]:
             record["sha256"] = record.pop("hash")
         if "sha256" in record:
             record["sha256"] = _digest(record["sha256"])
-        if "source_revision" in record and "revision" not in record:
+        if isinstance(record.get("source_revision"), dict):
+            from .vcs_backends import validate_revision
+            if "revision" in record:
+                raise TraceError("INVALID_SOURCE_REF", "typed source_revision cannot be combined with legacy revision")
+            if not validate_revision(record["source_revision"]):
+                raise TraceError("INVALID_SOURCE_REF", "source_revision must be a valid typed VCS observation")
+        elif "source_revision" in record and "revision" not in record:
             record["revision"] = record.pop("source_revision")
         if "revision" in record and record["revision"] is not None and (not isinstance(record["revision"], str) or not REVISION_RE.fullmatch(record["revision"])):
             raise TraceError("INVALID_SOURCE_REF", "revision must be a full Git revision or null")
@@ -357,18 +363,77 @@ def task_trace_list(root, object_id=None, offset=0, limit=50) -> dict:
     return {"status": "FAIL" if issues else "PASS", "issues": issues, "traces": page, "total": len(records), "offset": offset, "limit": limit, "next_offset": next_offset if next_offset < len(records) else None}
 
 
-def _audit_ref(root: Path, ref: dict[str, Any], revision: str | None) -> dict[str, Any]:
+def _typed_revision_state(root: Path, captured: dict[str, Any], scope_id: str | None) -> str:
+    """Compare a typed reference only with a fresh observation of its declared scope."""
+    from .v03_manifest import load_manifest
+    from .vcs_backends import backend_for, validate_revision
+    from .vcs_service import revision_identity
+
+    if not validate_revision(captured):
+        return "UNKNOWN"
+    try:
+        manifest, issues = load_manifest(root)
+        if issues:
+            return "UNKNOWN"
+        selected_id = scope_id or captured["scope_id"]
+        scope = next((item for item in manifest.effective_version_scopes()
+                      if item.scope_id == selected_id), None)
+        if scope is None:
+            return "UNKNOWN"
+        observation = backend_for(root, scope).status()
+        current = observation.get("source_revision") if isinstance(observation, dict) else None
+    except (ImportError, OSError, ValueError, TypeError, KeyError, RecursionError):
+        return "UNKNOWN"
+    if not validate_revision(current):
+        return "UNKNOWN"
+    for value in (captured, current):
+        if (value.get("availability") != "AVAILABLE"
+                or value.get("dirty_state") == "UNKNOWN"
+                or value.get("revision") is None):
+            return "UNKNOWN"
+    if current.get("scope_id") != scope.scope_id or current.get("backend") != scope.backend:
+        return "UNKNOWN"
+    return "CURRENT" if revision_identity(captured) == revision_identity(current) else "STALE"
+
+
+def _legacy_root_git_scope(root: Path, scope_id: str | None) -> bool:
+    """Whether the legacy Git-string alias is valid for this object scope."""
+    if scope_id is None:
+        return True  # Preserve callers using the historical root-Git default.
+    try:
+        from .v03_manifest import load_manifest
+        manifest, issues = load_manifest(root)
+        if issues:
+            return False
+        scope = next((item for item in manifest.effective_version_scopes()
+                      if item.scope_id == scope_id), None)
+        return scope is not None and scope.backend == "GIT" and scope.root == "."
+    except (ImportError, OSError, ValueError, TypeError, KeyError, RecursionError):
+        return False
+
+
+def _audit_ref(root: Path, ref: dict[str, Any], revision: str | None,
+               scope_id: str | None = None) -> dict[str, Any]:
     path = project_path(root, ref["path"])
     row = {**ref, "path_state": "CURRENT" if path.is_file() else "MISSING", "hash_state": "UNKNOWN", "revision_state": "UNKNOWN", "symbol_state": "UNKNOWN", "semantic_state": "UNKNOWN"}
     if row["path_state"] == "CURRENT" and "sha256" in ref:
         row["actual_sha256"] = file_sha256(path)
         row["hash_state"] = "CURRENT" if row["actual_sha256"] == ref["sha256"] else "STALE"
-    if ref.get("revision") is not None and revision is not None:
+    typed_revision = ref.get("source_revision") if isinstance(ref.get("source_revision"), dict) else None
+    if typed_revision is not None:
+        row["revision_state"] = _typed_revision_state(root, typed_revision, scope_id)
+    elif (ref.get("revision") is not None and revision is not None
+          and _legacy_root_git_scope(root, scope_id)):
         row["revision_state"] = "CURRENT" if revision == ref["revision"] else "STALE"
     states = [row["path_state"], row["hash_state"], row["revision_state"]]
     row["file_state"] = "MISSING" if "MISSING" in states else "STALE" if "STALE" in states else "CURRENT"
     row["state"] = row["file_state"]
-    if row["state"] == "CURRENT" and (ref.get("symbol") or (ref.get("revision") is not None and revision is None)):
+    if row["state"] == "CURRENT" and (
+        ref.get("symbol")
+        or (typed_revision is not None and row["revision_state"] != "CURRENT")
+        or (typed_revision is None and ref.get("revision") is not None
+            and row["revision_state"] != "CURRENT")
+    ):
         row["state"] = "UNKNOWN"
     return row
 
@@ -377,12 +442,29 @@ def _audit_ref(root: Path, ref: dict[str, Any], revision: str | None) -> dict[st
 def source_link_audit(root, object_ids=None) -> dict:
     catalog = _catalog(root)
     ids = sorted(catalog["objects"]) if object_ids is None else _array(object_ids, "object_ids")
-    revision = _git_state(root)["commit"]
-    results = []
-    issues = list(catalog.get("issues", []))
+    selected = []
     for identity in ids:
         record = _object(catalog, identity)
-        rows = [_audit_ref(root, ref, revision) for ref in _refs(root, record.get("source", []), "catalog.source")]
+        refs = _refs(root, record.get("source", []), "catalog.source")
+        selected.append((identity, record, refs))
+    typed_refs = [ref for _, _, refs in selected for ref in refs
+                  if isinstance(ref.get("source_revision"), dict)]
+    legacy_revisions = [ref for _, _, refs in selected for ref in refs
+                        if not isinstance(ref.get("source_revision"), dict)
+                        and ref.get("revision") is not None]
+    root_git_references = [
+        ref for _, record, refs in selected for ref in refs
+        if not isinstance(ref.get("source_revision"), dict)
+        and ref.get("revision") is not None
+        and _legacy_root_git_scope(root, record.get("git_scope") or "main")
+    ]
+    needs_legacy_default = not typed_refs and not legacy_revisions
+    revision = _git_state(root)["commit"] if needs_legacy_default or root_git_references else None
+    results = []
+    issues = list(catalog.get("issues", []))
+    for identity, record, refs in selected:
+        scope_id = record.get("git_scope") or "main"
+        rows = [_audit_ref(root, ref, revision, scope_id) for ref in refs]
         states = [row["state"] for row in rows]
         state = "MISSING" if "MISSING" in states else "STALE" if "STALE" in states else "UNKNOWN" if not states or "UNKNOWN" in states else "CURRENT"
         for row in rows:

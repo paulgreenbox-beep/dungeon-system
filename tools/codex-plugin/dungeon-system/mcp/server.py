@@ -14,12 +14,13 @@ import math
 import os
 import re
 import sys
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
 
-VERSION = "0.4.1"
+VERSION = "0.4.2-rc1"
 sys.dont_write_bytecode = True
 PROTOCOL_VERSION = "2025-11-25"
 HANDSHAKE_VERSIONS = {"2025-11-25", "2025-06-18", "2025-03-26"}
@@ -41,6 +42,27 @@ class ProjectContext:
     diagnosis: dict[str, Any] | None = None
 
 
+@dataclass(frozen=True)
+class RequestPolicy:
+    """Operator-supplied HTTP capability, never populated from tool arguments."""
+
+    project_roots: tuple[str, ...]
+    writable_roots: tuple[str, ...] = ()
+    input_roots: tuple[str, ...] = ()
+
+
+_REQUEST_POLICY: ContextVar[RequestPolicy | None] = ContextVar("dungeon_request_policy", default=None)
+
+
+@contextlib.contextmanager
+def request_policy(policy: RequestPolicy):
+    token = _REQUEST_POLICY.set(policy)
+    try:
+        yield
+    finally:
+        _REQUEST_POLICY.reset(token)
+
+
 def _schema(properties: dict[str, Any] | None = None, required: list[str] | None = None) -> dict[str, Any]:
     return {
         "type": "object",
@@ -52,6 +74,8 @@ def _schema(properties: dict[str, Any] | None = None, required: list[str] | None
 
 STRING = {"type": "string", "minLength": 1}
 PROJECT_ROOT = {"type": "string", "minLength": 1, "description": "Absolute path to the project root."}
+VCS_SCOPE_ID = {"type": "string", "minLength": 1, "maxLength": 128}
+VCS_REVISION = {"type": "string", "minLength": 1, "maxLength": 256}
 TOOLS = [
     {"name": "dungeon_project_probe", "description": "Diagnose MANAGED, SKLT_ONLY, NOT_DUNGEON, INVALID_MANAGED or UNAVAILABLE before exploration; returns counts, issues and onboarding steps without writes. Use adoption_plan for an uninitialized project.", "inputSchema": _schema(required=["project_root"]), "readOnly": True},
     {"name": "dungeon_adoption_plan", "description": "Plan onboarding of NOT_DUNGEON or SKLT_ONLY without writes. Returns candidate modules, existing IDs, conflicts and plan fingerprint; review accepted modules before explicit adoption_apply.", "inputSchema": _schema({"project_id": STRING}, ["project_root"]), "readOnly": True},
@@ -83,6 +107,10 @@ TOOLS = [
     {"name": "dungeon_cas_status", "description": "Read availability, object count and bytes of the configured external CAS.", "inputSchema": _schema(), "readOnly": True},
     {"name": "dungeon_cas_verify", "description": "Verify exact CAS bytes against a sha256 reference.", "inputSchema": _schema({"reference": STRING}, ["reference"]), "readOnly": True},
     {"name": "dungeon_cas_put", "description": "Store exact bytes of an existing absolute file path in CAS and return its SHA-256 reference.", "inputSchema": _schema({"file_path": STRING}, ["file_path"]), "readOnly": False, "idempotent": True},
+    {"name": "dungeon_vcs_status", "description": "Read declared version-control scope status in MANAGED without writes.", "inputSchema": _schema({"scope_id": VCS_SCOPE_ID}, ["project_root"]), "readOnly": True},
+    {"name": "dungeon_vcs_inspect", "description": "Inspect one revision in a declared version-control scope in MANAGED without writes.", "inputSchema": _schema({"scope_id": VCS_SCOPE_ID, "revision": VCS_REVISION}, ["project_root"]), "readOnly": True},
+    {"name": "dungeon_vcs_history", "description": "Read bounded history for a declared version-control scope in MANAGED without writes.", "inputSchema": _schema({"scope_id": VCS_SCOPE_ID, "revision": VCS_REVISION, "limit": {"type": "integer", "minimum": 1, "maximum": 100}}, ["project_root"]), "readOnly": True},
+    {"name": "dungeon_vcs_diff", "description": "Read a diff for a declared version-control scope in MANAGED without writes.", "inputSchema": _schema({"scope_id": VCS_SCOPE_ID}, ["project_root"]), "readOnly": True},
 ]
 TOOL_DESCRIPTIONS = {
     "dungeon_connect_project": "Compatibility alias of project_probe: diagnose all five project modes, counts and next steps without writes. Connection is stateless; use adoption_plan when uninitialized.",
@@ -119,6 +147,13 @@ for item in TOOLS:
         })
 TOOL_BY_NAME = {item["name"]: item for item in TOOLS}
 WRITE_TOOL_NAMES = frozenset(name for name, item in TOOL_BY_NAME.items() if not item["readOnly"])
+VCS_TOOL_OPERATIONS = {
+    "dungeon_vcs_status": "status",
+    "dungeon_vcs_inspect": "inspect",
+    "dungeon_vcs_history": "history",
+    "dungeon_vcs_diff": "diff",
+}
+VCS_TOOL_NAMES = frozenset(VCS_TOOL_OPERATIONS)
 
 
 def _tool_list() -> list[dict[str, Any]]:
@@ -230,6 +265,12 @@ def _read_root(value: str | os.PathLike[str]) -> Path:
 
 def _selected_root(arguments: dict[str, Any], *, for_write: bool = False) -> Path:
     selected = arguments.get("project_root")
+    policy = _REQUEST_POLICY.get()
+    if policy is not None:
+        selected = _required_string(arguments, "project_root")
+        root = _read_root(selected)
+        if root not in {_read_root(value) for value in policy.project_roots}:
+            raise PermissionError("project_root is not authorized for this HTTP client")
     if selected is None:
         return _default_root()
     if for_write:
@@ -285,7 +326,8 @@ def _project_context(arguments: dict[str, Any], *, for_write: bool = False) -> P
 
 
 def _writable_roots(*, for_write: bool = False) -> set[Path]:
-    configured = os.environ.get("DUNGEON_WRITABLE_ROOTS")
+    policy = _REQUEST_POLICY.get()
+    configured = json.dumps(policy.writable_roots) if policy is not None else os.environ.get("DUNGEON_WRITABLE_ROOTS")
     if configured is None:
         return set()
     try:
@@ -386,11 +428,21 @@ def _valid_object_id(value: Any) -> bool:
 
 def _required_input_file(arguments: dict[str, Any], key: str) -> str:
     value = _required_string(arguments, key)
+    if _REQUEST_POLICY.get() is not None and not Path(value).is_absolute():
+        raise ValueError(f"{key} must be an explicit absolute file path")
     path = Path(value).expanduser()
     if not path.is_absolute():
         raise ValueError(f"{key} must be an absolute file path")
     if not path.is_file():
         raise ValueError(f"{key} must name an existing file")
+    policy = _REQUEST_POLICY.get()
+    if policy is not None:
+        _checked_root(path.parent)
+        if path.is_symlink() or getattr(path.lstat(), "st_file_attributes", 0) & 0x400:
+            raise PermissionError(f"{key} must not traverse a reparse point")
+        allowed = tuple(_checked_root(value) for value in (*policy.project_roots, *policy.input_roots))
+        if not any(path.resolve().is_relative_to(root) for root in allowed):
+            raise PermissionError(f"{key} is outside this HTTP client's input roots")
     return str(path.resolve())
 
 
@@ -472,6 +524,12 @@ def _call(name: str, arguments: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         raise ValueError(f"unknown Dungeon MCP tool: {name}")
     if not isinstance(arguments, dict):
         raise ValueError("tool arguments must be an object")
+    if _REQUEST_POLICY.get() is not None:
+        # No default checkout, ambient cwd or another client's environment may
+        # select a target in the shared transport. Recheck in the worker too.
+        _selected_root(arguments, for_write=name in WRITE_TOOL_NAMES)
+        if "executable_path" in arguments:
+            _required_input_file(arguments, "executable_path")
     if name in WRITE_TOOL_NAMES:
         _authorize_write_root(arguments, name)
     schema = TOOL_BY_NAME[name]["inputSchema"]
@@ -487,10 +545,18 @@ def _call(name: str, arguments: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         _validate_value(value, schema["properties"][key], key)
     context = _project_context(arguments, for_write=name in WRITE_TOOL_NAMES)
     root = context.root
+    if name in VCS_TOOL_NAMES and context.mode not in {"MANAGED", "DUNGEON"}:
+        return {
+            "status": "FAIL",
+            "project_root": str(root),
+            "project_mode": context.mode,
+            "issues": [{"code": "VCS_REQUIRES_MANAGED_PROJECT", "severity": "ERROR",
+                        "message": "Version-control queries require a MANAGED Dungeon project."}],
+        }, False
     managed_tools = {"dungeon_validate", "dungeon_refresh", "dungeon_snapshot", "dungeon_snapshot_diff",
                      "dungeon_evidence_for", "dungeon_evidence_inspect", "dungeon_evidence_verify",
                      "dungeon_evidence_create", "dungeon_evidence_seal", "dungeon_cas_status",
-                     "dungeon_cas_verify", "dungeon_cas_put"}
+                     "dungeon_cas_verify", "dungeon_cas_put", *VCS_TOOL_NAMES}
     metadata_tools = {"dungeon_task_trace_write", "dungeon_coverage_set"}
     if name in managed_tools:
         _require_managed(context, name)
@@ -511,6 +577,19 @@ def _call(name: str, arguments: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         return payload, payload.get("status") not in {"FAIL", "BLOCKED", "ERROR"}
     if context.mode not in {"MANAGED", "SKLT_ONLY"}:
         return {**_project_info(context), "status": "BLOCKED"}, False
+    if name in VCS_TOOL_OPERATIONS:
+        from project_structure.vcs_service import vcs_query
+
+        payload = vcs_query(
+            root,
+            VCS_TOOL_OPERATIONS[name],
+            scope_id=arguments.get("scope_id"),
+            revision=arguments.get("revision"),
+            limit=arguments.get("limit", 20),
+        )
+        payload.setdefault("project_root", str(root))
+        payload.setdefault("project_mode", "DUNGEON")
+        return payload, payload.get("status") in {"PASS", "PARTIAL"}
     if name in {"dungeon_project_summary", "dungeon_list_modules"}:
         catalog = projects.project_catalog(root)
         modules = [{key: row.get(key) for key in ("id", "path", "object_count", "sklt_count", "dialects")}
@@ -774,7 +853,7 @@ def _rpc_error(request_id: Any, code: int, message: str) -> dict[str, Any]:
             "error": {"code": code, "message": message}}
 
 
-def _handle(request: Any) -> dict[str, Any] | None:
+def _request_error(request: Any) -> dict[str, Any] | None:
     if not isinstance(request, dict):
         return _rpc_error(_MISSING, -32600, "Invalid Request")
     request_id = request.get("id", _MISSING)
@@ -832,6 +911,17 @@ def _handle(request: Any) -> dict[str, Any] | None:
             return _rpc_error(request_id, -32602, "Invalid params: protocolVersion must be a string")
         if not isinstance(params.get("capabilities"), dict) or not isinstance(params.get("clientInfo"), dict):
             return _rpc_error(request_id, -32602, "Invalid params: capabilities and clientInfo must be objects")
+
+    return None
+
+
+def _handle(request: Any) -> dict[str, Any] | None:
+    error = _request_error(request)
+    if error is not None:
+        return error
+    request_id = request.get("id", _MISSING)
+    method = request["method"]
+    params = request.get("params", {})
 
     if request_id is _MISSING:
         if method == "notifications/initialized":

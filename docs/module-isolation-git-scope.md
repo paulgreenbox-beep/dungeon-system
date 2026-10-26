@@ -1,6 +1,6 @@
 # Module isolation and GitScope policy
 
-Политика определяет, как логические модули и уровни Dungeon System соотносятся с Git repositories, source boundaries, dependencies, snapshots и evidence.
+Политика определяет, как логические модули и уровни Dungeon System соотносятся с VCS history scopes, source boundaries, dependencies, snapshots и evidence. GitScope остаётся совместимым представлением Git-конфигурации.
 
 > **Level определяет логическую границу. GitScope определяет границу истории. Они могут совпадать, но не обязаны.**
 
@@ -31,6 +31,7 @@ DungeonId
 LevelId
 ObjectId
 GitScopeId
+VersionScopeId
 RepositoryId
 ```
 
@@ -100,6 +101,35 @@ EXTERNAL
   ]
 }
 ```
+
+### VersionScope compatibility
+
+Новая версия не переименовывает существующий GitScope и не меняет SKLT field git_scope. Это стабильный логический указатель на history scope; для Git он продолжает разрешаться через legacy git_scopes. Implicit Git scope `main` сохраняется только если ни `git_scopes`, ни `version_scopes` явно не объявляет scope с ID `main`.
+
+Опциональный version_scopes расширяет manifest без удаления git_scopes. Пример содержит один сохранённый Git scope и отдельный opt-in Scion scope:
+
+~~~json
+{
+  "git_scopes": [
+    {"id": "main", "mode": "MONOREPO", "repository": ".", "root": "."}
+  ],
+  "version_scopes": [
+    {
+      "id": "scion-lab",
+      "backend": "SCION",
+      "root": "lab",
+      "repository": "lab",
+      "mode": "MONOREPO",
+      "default_ref": "main",
+      "endpoint_profile": "LAB"
+    }
+  ]
+}
+~~~
+
+VersionScope fields are strict; unknown fields are invalid. Both root and repository are project-relative and may not escape the project. endpoint_profile is an environment-profile name, never a token or credential. A missing backend on a version-scope entry defaults to Git. Git remains the default backend.
+
+One Level may map to a Git or Scion VersionScope, and one scope may serve multiple Levels. A VCS boundary does not redefine isolation, LevelId, ObjectId, SKLT identity, or GLIF object_id. The full experimental operation matrix is in [VCS backends](vcs-backends.md).
 
 ## 4. Isolation
 
@@ -187,6 +217,8 @@ Snapshot всего Dungeon фиксирует набор revisions, а не о�
 
 Evidence Manifest фиксирует только relevant GitScopes: если run не зависел от repository, его revision не записывается. Dependencies должны быть воспроизводимы.
 
+Typed revisions carry backend and scope identity. A Scion changeset ID is BLAKE3-namespaced and is not a Git object ID or Dungeon CAS SHA-256. For Scion the local state file identifies a working-copy base, not a clean or current remote revision; until a safe status path exists, dirty state remains UNKNOWN.
+
 ## 7. Миграция
 
 Перенос уровня между scopes сохраняет:
@@ -238,6 +270,8 @@ migration event
 ```
 
 Это association, а не атомарная Git-транзакция. Dungeon System не утверждает, что commits нескольких repository физически атомарны: корректная semantics — logical coordinated state. Новый VCS поверх Git не создаётся.
+
+The same rule applies across VCS backends: a multi-scope snapshot stores per-scope observations and does not imply cross-backend atomicity.
 
 ## 9. Cronica
 

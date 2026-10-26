@@ -41,9 +41,10 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(verify.scan_content("tools/project_structure/model.py", b"value = 42\n"), [])
 
     def test_local_artifacts_and_binaries_are_denied_independently_of_gitignore(self):
-        for path in ("artifacts/report.json", "Artifacts/capture.json", "snapshots/test/manifest.json",
+        for path in ("artifacts/report.json", "Artifacts/capture.json", "archive/local/receipt.json", "snapshots/test/manifest.json",
                      "tools/codex-plugin/backups/source.py", "tools/hardening_v041/private.py",
-                     "docs/audits/private-packet.json", ".project/objects.json", "scoping/.exp", "app.exe", "module.pyd"):
+                     "docs/audits/private-packet.json", ".project/objects.json", "scoping/.exp", "app.exe", "module.pyd",
+                     ".project/http-service.lock", "nested/http-service.local.json"):
             with self.subTest(path=path):
                 self.assertTrue(verify.path_issues(path))
 

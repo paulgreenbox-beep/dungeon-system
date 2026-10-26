@@ -24,6 +24,21 @@
     "created_at": {"type": "string", "format": "date-time"},
     "task_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"},
     "scope": {"enum": ["PROTOTYPE", "PRODUCT"]},
+    "source_revision": {
+      "description": "Optional versioned per-scope observations. A local base and CAS integrity do not establish current execution proof.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "scopes"],
+      "properties": {
+        "schema_version": {"type": "integer", "const": 1},
+        "scopes": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$(?![\\s\\S])"},
+          "additionalProperties": {"$ref": "#/$defs/typedRevision"}
+        }
+      }
+    },
     "build": {
       "type": "object",
       "additionalProperties": false,
@@ -124,7 +139,33 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {"required": ["source_revision"]},
+      "then": {"required": ["source"], "properties": {"source": {"properties": {"files": {"minItems": 1}}}}}
+    }
+  ],
   "$defs": {
+    "typedRevision": {
+      "type": "object",
+      "required": ["schema_version", "backend", "scope_id", "revision", "ref", "dirty_state", "availability"],
+      "properties": {
+        "schema_version": {"type": "integer", "const": 1},
+        "backend": {"enum": ["GIT", "SCION"]},
+        "scope_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$(?![\\s\\S])"},
+        "revision": {"type": ["string", "null"]},
+        "ref": {"type": ["string", "null"], "minLength": 1, "maxLength": 256, "pattern": "^[^\\u0000-\\u001f\\u007f]+$(?![\\s\\S])"},
+        "dirty_state": {"enum": ["CLEAN", "DIRTY", "UNKNOWN"]},
+        "availability": {"enum": ["AVAILABLE", "UNAVAILABLE", "UNSUPPORTED_PLATFORM", "NOT_CONFIGURED", "AUTH_REQUIRED", "SERVER_UNREACHABLE", "UNKNOWN"]},
+        "observed_at": {"type": "string"}
+      },
+      "allOf": [
+        {"if": {"properties": {"backend": {"const": "GIT"}}}, "then": {"properties": {"revision": {"pattern": "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$(?![\\s\\S])"}}}},
+        {"if": {"properties": {"backend": {"const": "SCION"}}}, "then": {"properties": {"revision": {"pattern": "^c1[0-9a-f]{64}$(?![\\s\\S])"}}}},
+        {"if": {"properties": {"revision": {"type": "null"}}}, "then": {"properties": {"dirty_state": {"const": "UNKNOWN"}, "availability": {"not": {"const": "AVAILABLE"}}}}},
+        {"if": {"properties": {"availability": {"not": {"const": "AVAILABLE"}}}}, "then": {"properties": {"dirty_state": {"const": "UNKNOWN"}}}}
+      ]
+    },
     "objectId": {"type": "string", "maxLength": 1024, "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9._-]*|declared:(?:(?:capability|command|action):[A-Za-z_][A-Za-z0-9_.:-]*|(?:project|module):[A-Za-z_][A-Za-z0-9_.:-]*(?:/(?:project|module):[A-Za-z_][A-Za-z0-9_.:-]*)*(?:/(?:project|module|capability|command|action):[A-Za-z_][A-Za-z0-9_.:-]*)?))$"},
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "casReference": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}

@@ -23,4 +23,8 @@ def validate_snapshot_schema(root: Path) -> list[Issue]:
             continue
         if isinstance(data, dict) and data.get("schema_version") is not None and str(data.get("schema_version")) != "1":
             issues.append(Issue("UNSUPPORTED_SCHEMA_VERSION", f"snapshot schema {data.get('schema_version')} is not supported", manifest_path))
+        if isinstance(data, dict) and ("revisions" in data or "revisions_schema" in data):
+            from .vcs_service import provenance_errors
+            errors = provenance_errors({"schema_version": data.get("revisions_schema"), "scopes": data.get("revisions")})
+            issues.extend(Issue("INVALID_SNAPSHOT_REVISIONS", error, manifest_path) for error in errors)
     return issues

@@ -31,6 +31,7 @@ EXPECTED_TOOLS = {
     "dungeon_snapshot", "dungeon_snapshot_diff", "dungeon_evidence_for",
     "dungeon_evidence_inspect", "dungeon_evidence_verify", "dungeon_evidence_create",
     "dungeon_evidence_seal", "dungeon_cas_status", "dungeon_cas_verify", "dungeon_cas_put",
+    "dungeon_vcs_status", "dungeon_vcs_inspect", "dungeon_vcs_history", "dungeon_vcs_diff",
 }
 WRITE_TOOLS = {
     "dungeon_adoption_apply", "dungeon_task_trace_write", "dungeon_coverage_set",
@@ -126,12 +127,12 @@ class V041TransportTests(unittest.TestCase):
         ]
         replies = self.wire(requests)
         self.assertEqual([reply["id"] for reply in replies], [0, 1, 2, 3])
-        self.assertEqual(replies[0]["result"]["serverInfo"]["version"], "0.4.1")
+        self.assertEqual(replies[0]["result"]["serverInfo"]["version"], "0.4.2-rc1")
         self.assertEqual(replies[1]["result"], {})
         tools = replies[2]["result"]["tools"]
         names = {tool["name"] for tool in tools}
         self.assertEqual(names, EXPECTED_TOOLS)
-        self.assertEqual(len(tools), 30)
+        self.assertEqual(len(tools), 34)
         for tool in tools:
             self.assertFalse(tool["inputSchema"]["additionalProperties"])
             if tool["name"] in WRITE_TOOLS:

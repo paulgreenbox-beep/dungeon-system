@@ -5,6 +5,8 @@ description: Capture, inspect or verify Dungeon System execution evidence and CA
 
 # Preserve and check evidence
 
+Runtime-002 is fixture evidence only: keep `CAPTURED_UNSEALED`, verified source CAS bytes, and current proof separate. `SOURCE_REVISION_UNKNOWN` is a safe seal refusal; a typed local Scion base is not current proof. See the [runtime record](../../../../../docs/integrations/scion-runtime-check.md), and do not promote the fixture to target-project coverage.
+
 First use `dungeon_project_probe` and pass that absolute `project_root` on every call. Evidence/CAS commands require MANAGED (legacy project_mode DUNGEON). SKLT_ONLY can read/write authorized Task Trace metadata but needs explicit adoption for its CAS Evidence Store. For an existing record, use evidence_for/inspect then evidence_verify; report integrity state with manifest ID and failed hashes. CAS availability is separate from structural validation and current-build applicability.
 
 For a new execution, first inspect the object and its SKLT. If UI or a Toolkit container is involved, read the linked GLIF and the current guide selected from `Rust_Makepad_Toolkit/docs/INDEX.md`; Dungeon System does not run the container. Capture only the chosen exact output files with `dungeon_cas_put` using absolute file paths, then check each returned reference with `dungeon_cas_verify`.
@@ -16,3 +18,5 @@ For executable tests capture the exact EXE SHA-256 and preserve task, source and
 For v0.4.1 current-proof evaluation, read [the implemented adapter contract](../../references/proof-adapters-v041.md). New proof requires matching typed `id`/`type`/`scope`, Task Trace performed checks and actual result `PASS`, plus the versioned Toolkit reliability-v2 raw CAS receipt and supported bindings. Unknown/legacy native receipts, missing raw bytes, or unaccounted additional non-result artifacts fail closed as `PROOF_UNVERIFIED`; do not claim `VERIFIED` from a seal alone. The current proof state (`VERIFIED`, `INCOMPLETE`, `CONFLICT`, `STALE`, `INVALID`) is separate from immutable manifest/CAS integrity. Capture each SKLT obligation hash in new evidence; later SKLT changes make current proof stale without rewriting old sealed manifests.
 
 Read-only evidence inspection remains cross-platform. Writes require an exact explicitly approved physical root (`[]` authorizes none) and fail closed where the Windows writer lease is unavailable. Windows staging/rollback covers caught failures, not crashes or power loss.
+
+For typed VersionScope provenance, read the [Scion reference](../../references/scion.md): legacy root-main Git receipts remain on the existing accepted path, while typed Scion/nonlegacy receipts fail closed as `VCS_PROOF_ADAPTER_UNSUPPORTED` until a compatible adapter exists.

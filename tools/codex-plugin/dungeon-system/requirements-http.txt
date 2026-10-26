@@ -1,0 +1,3 @@
+# Optional coordinator only. The stdio bridge remains dependency-free.
+# Review the dependency/lock and security advisories before deployment.
+aiohttp==3.14.5

@@ -5,6 +5,8 @@ description: Make or review structural changes in a managed Dungeon project, or 
 
 # Change project structure
 
+Runtime-002 fixture evidence does not authorize changing a target checkout, scope, or structure. Preserve unsupported-platform observations and unknown source state; use only the bounded read-only query contract unless a separate task explicitly authorizes a change.
+
 Use `dungeon_project_probe`, then pass that absolute `project_root` on every MCP call. Begin with that project's status and orientation; select summary → module → object before broad inspection. All write tools need an explicit root.
 
 Every write needs the caller-supplied exact physical root in the approved allowlist. The default is `[]` (no writable root), including for the default checkout. Reject raw UNC, `..`, and junction/reparse traversal before path normalization. Read-only inspection remains cross-platform; the core writer lease is Windows-only and writes fail closed elsewhere. Windows writes stage and roll back caught failures but are not crash-safe multi-file transactions.
@@ -16,3 +18,5 @@ For `SKLT_ONLY`, module/object navigation, source audit and Task Trace work befo
 Prototype/Product coverage and current-proof records are not structural edits. Keep the scopes independent and never change SKLT/RARE, EXP, or grade to represent coverage. Preserve parser-returned logical object IDs exactly; never use them as paths.
 
 The MCP write tools require an explicit root and an administrator-configured writable-root allowlist. A snapshot is not a Git backup or runtime capture.
+
+For VersionScope declarations, keep legacy `git_scopes` and SKLT `git_scope` references intact; see the [Scion reference](../../references/scion.md) for the additive experimental backend and its boundaries.

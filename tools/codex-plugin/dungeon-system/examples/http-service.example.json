@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "home_root": "C:/REPLACE_WITH/Dungeon System",
+  "host": "127.0.0.1",
+  "port": 8768,
+  "workers": 2,
+  "queue_limit": 16,
+  "request_timeout_sec": 45,
+  "body_timeout_sec": 5,
+  "startup_timeout_sec": 15,
+  "shutdown_grace_sec": 30,
+  "session_idle_sec": 900,
+  "max_sessions": 64,
+  "max_sessions_per_client": 8,
+  "max_requests_per_session": 2048,
+  "max_connections": 48,
+  "max_http_requests": 32,
+  "per_client_limit": 8,
+  "per_session_limit": 4,
+  "history_limit": 32,
+  "history_ttl_sec": 300,
+  "admin_token_env_var": "DUNGEON_HTTP_ADMIN_TOKEN",
+  "clients": [
+    {
+      "id": "codex-local",
+      "token_env_var": "DUNGEON_HTTP_CODEX_TOKEN",
+      "project_roots": ["C:/REPLACE_WITH/Dungeon System"],
+      "writable_roots": [],
+      "input_roots": []
+    }
+  ]
+}
